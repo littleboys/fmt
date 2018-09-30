@@ -2670,7 +2670,7 @@ class basic_writer {
   struct double_writer {
     size_t n;
     char sign;
-    basic_memory_buffer<char_type> &buffer;
+    internal::buffer &buffer;
 
     template <typename It>
     void operator()(It &&it) {
@@ -2678,7 +2678,7 @@ class basic_writer {
         *it++ = static_cast<char_type>(sign);
         --n;
       }
-      it = std::copy_n(buffer.begin(), n, it);
+      it = internal::copy_str<char_type>(buffer.begin(), buffer.end(), it);
     }
   };
 
@@ -2687,7 +2687,7 @@ class basic_writer {
   void write_double(T value, const format_specs &spec);
   template <typename T>
   void write_double_sprintf(T value, const format_specs &spec,
-                            internal::basic_buffer<char_type> &buffer);
+                            internal::buffer &buffer);
 
   template <typename Char>
   struct str_writer {
@@ -2708,15 +2708,6 @@ class basic_writer {
 
   template <typename Char>
   void write_str(basic_string_view<Char> str, const format_specs &spec);
-
-  // Appends floating-point length specifier to the format string.
-  // The second argument is only used for overload resolution.
-  void append_float_length(char_type *&format_ptr, long double) {
-    *format_ptr++ = 'L';
-  }
-
-  template<typename T>
-  void append_float_length(char_type *&, T) {}
 
   template <typename Char>
   friend class internal::arg_formatter_base;
@@ -2907,7 +2898,7 @@ void basic_writer<Range>::write_double(T value, const format_specs &spec) {
   if (internal::fputil::isinfinity(value))
     return write_inf_or_nan(handler.upper ? "INF" : "inf");
 
-  basic_memory_buffer<char_type> buffer;
+  memory_buffer buffer;
   char type = static_cast<char>(spec.type());
   if (internal::const_check(
         internal::use_grisu() && sizeof(T) <= sizeof(double)) &&
@@ -2946,15 +2937,14 @@ void basic_writer<Range>::write_double(T value, const format_specs &spec) {
 template <typename Range>
 template <typename T>
 void basic_writer<Range>::write_double_sprintf(
-    T value, const format_specs &spec,
-    internal::basic_buffer<char_type> &buffer) {
+    T value, const format_specs &spec, internal::buffer &buffer) {
   // Buffer capacity must be non-zero, otherwise MSVC's vsnprintf_s will fail.
   FMT_ASSERT(buffer.capacity() != 0, "empty buffer");
 
   // Build format string.
   enum { MAX_FORMAT_SIZE = 10}; // longest format: %#-*.*Lg
-  char_type format[MAX_FORMAT_SIZE];
-  char_type *format_ptr = format;
+  char format[MAX_FORMAT_SIZE];
+  char *format_ptr = format;
   *format_ptr++ = '%';
   if (spec.flag(HASH_FLAG))
     *format_ptr++ = '#';
@@ -2962,17 +2952,17 @@ void basic_writer<Range>::write_double_sprintf(
     *format_ptr++ = '.';
     *format_ptr++ = '*';
   }
-
-  append_float_length(format_ptr, value);
+  if (std::is_same<T, long double>::value)
+    *format_ptr++ = 'L';
   *format_ptr++ = spec.type();
   *format_ptr = '\0';
 
   // Format using snprintf.
-  char_type *start = FMT_NULL;
+  char *start = FMT_NULL;
   for (;;) {
     std::size_t buffer_size = buffer.capacity();
     start = &buffer[0];
-    int result = internal::char_traits<char_type>::format_float(
+    int result = internal::char_traits<char>::format_float(
         start, buffer_size, format, spec.precision(), value);
     if (result >= 0) {
       unsigned n = internal::to_unsigned(result);
