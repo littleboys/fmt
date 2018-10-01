@@ -1398,17 +1398,15 @@ FMT_API void vprint(std::FILE *f, wstring_view format_str, wformat_args args);
   **Example**::
 
     fmt::print(stderr, "Don't {}!", "panic");
-
   \endrst
  */
-template <typename String, typename... Args>
-inline typename std::enable_if<internal::is_format_string<String>::value>::type
-print(std::FILE *f, const String &format_str, const Args &... args) {
+template <typename S, typename... Args>
+inline typename std::enable_if<internal::is_format_string<S>::value>::type
+    print(std::FILE *f, const S &format_str, const Args &... args) {
   internal::check_format_string<Args...>(format_str);
-  typedef typename buffer_context< FMT_CHAR(String)>::type context_t;
-  format_arg_store<context_t, Args...> as{ args... };
-  vprint(f, basic_string_view< FMT_CHAR(String)>(format_str),
-         basic_format_args<context_t>(as));
+  format_arg_store<
+      typename buffer_context<FMT_CHAR(S)>::type, Args...> as{args...};
+  vprint(f, basic_string_view<FMT_CHAR(S)>(format_str), as);
 }
 
 FMT_API void vprint(string_view format_str, format_args args);
@@ -1423,14 +1421,13 @@ FMT_API void vprint(wstring_view format_str, wformat_args args);
     fmt::print("Elapsed time: {0:.2f} seconds", 1.23);
   \endrst
  */
-template <typename String, typename... Args>
-inline typename std::enable_if<internal::is_format_string<String>::value>::type
-print(const String &format_str, const Args &... args) {
+template <typename S, typename... Args>
+inline typename std::enable_if<internal::is_format_string<S>::value>::type
+    print(const S &format_str, const Args &... args) {
   internal::check_format_string<Args...>(format_str);
-  typedef typename buffer_context<FMT_CHAR(String)>::type context_t;
-  format_arg_store<context_t, Args...> as{ args... };
-  vprint(basic_string_view<FMT_CHAR(String)>(format_str),
-         basic_format_args<context_t>(as));
+  format_arg_store<
+      typename buffer_context<FMT_CHAR(S)>::type, Args...> as{args...};
+  vprint(basic_string_view<FMT_CHAR(S)>(format_str), as);
 }
 FMT_END_NAMESPACE
 
